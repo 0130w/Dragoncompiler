@@ -8,8 +8,14 @@ import org.antlr.v4.runtime.dfa.DFA;
 import java.util.BitSet;
 
 public class MyErrorListener extends BaseErrorListener {
+    boolean hasError = false;
     @Override
     public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine, String msg, RecognitionException e) {
-        System.err.println("Error Type A at line " + line + ": " + msg);
+        System.err.println("Error Type A at line " + line + ": " + msg + ".");
+        hasError = true;
+    }
+
+    public boolean hasError() {
+        return hasError;
     }
 }

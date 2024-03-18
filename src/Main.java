@@ -17,8 +17,10 @@ public class Main
         MyErrorListener myErrorListener = new MyErrorListener();
         sysYLexer.addErrorListener(myErrorListener);
         List<? extends Token> myTokens = sysYLexer.getAllTokens();
-        for (Token token : myTokens) {
-            printSysYTokenInformation(token);
+        if (!myErrorListener.hasError()) {
+            for (Token token : myTokens) {
+                printSysYTokenInformation(token);
+            }
         }
     }
 
