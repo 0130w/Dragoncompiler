@@ -16,4 +16,6 @@ if [ "$output" == "$expected_output" ]; then
     echo "output match expected output"
 else
     echo "output does not match expected output"
+    echo "Expected: $expected_output"
+    echo "Got: $output"
 fi
