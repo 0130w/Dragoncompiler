@@ -15,6 +15,8 @@ public class Main
         CharStream input = CharStreams.fromFileName(source);
         SysYLexer sysYLexer = new SysYLexer(input);
         sysYLexer.removeErrorListeners();
-        sysYLexer.addErrorListener(new MyErrorListener());
+        MyErrorListener myErrorListener = new MyErrorListener();
+        sysYLexer.addErrorListener(myErrorListener);
+        sysYLexer.getAllTokens().forEach(System.out::println);
     }
 }
