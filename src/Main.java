@@ -10,7 +10,7 @@ public class Main
         }
         try {
             String content = Files.readString(Path.of(args[0]));
-            System.out.println(content);
+            System.out.print(content);
         } catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
         }
