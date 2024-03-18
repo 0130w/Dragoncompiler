@@ -8,7 +8,7 @@ fi
 input_file=$1
 expected_file=$2
 
-output=$(make run FILEPATH="$input_file")
+output=$(make run FILEPATH="$input_file" > /dev/null 2>&1 && java -classpath ./classes:/usr/local/lib/antlr-4.9.1-complete.jar Main "$input_file")
 
 expected_output=$(cat "$expected_file")
 
