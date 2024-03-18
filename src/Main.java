@@ -5,6 +5,7 @@ public class Main
 {    
     public static void main(String[] args){
         String file_arg = args[0];
+        System.out.println("File arg: " + file_arg);
         String[] file_parts = file_arg.split("=");
         if (file_parts.length > 1) {
             try {
