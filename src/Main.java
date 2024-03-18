@@ -30,9 +30,9 @@ public class Main
         int tokenLine = token.getLine();
         if (tokenType.equals("INTEGER_CONST")) {
             int value = parseTokenValue(tokenText);
-            System.out.println(tokenType + " " + value + " at Line " + tokenLine + ".");
+            System.err.println(tokenType + " " + value + " at Line " + tokenLine + ".");
         } else {
-            System.out.println(tokenType + " " + tokenText + " at Line " + tokenLine + ".");
+            System.err.println(tokenType + " " + tokenText + " at Line " + tokenLine + ".");
         }
     }
 
