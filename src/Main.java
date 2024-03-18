@@ -1,9 +1,8 @@
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
-
+import org.antlr.v4.runtime.Token;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+import java.util.List;
 
 public class Main
 {    
@@ -17,6 +16,17 @@ public class Main
         sysYLexer.removeErrorListeners();
         MyErrorListener myErrorListener = new MyErrorListener();
         sysYLexer.addErrorListener(myErrorListener);
-        sysYLexer.getAllTokens().forEach(System.out::println);
+        List<? extends Token> myTokens = sysYLexer.getAllTokens();
+        for (Token token : myTokens) {
+            printSysYTokenInformation(token);
+        }
+    }
+
+    private static void printSysYTokenInformation(Token token) {
+        String tokenType = SysYLexer.VOCABULARY.getSymbolicName(token.getType());
+        String tokenText = token.getText();
+        int tokenLine = token.getLine();
+        int tokenColumn = token.getCharPositionInLine();
+        System.out.println(tokenType + " " + tokenText + " " + tokenLine + " " + tokenColumn);
     }
 }
