@@ -28,11 +28,6 @@ public class Main
         String tokenType = SysYLexer.VOCABULARY.getSymbolicName(token.getType());
         String tokenText = token.getText();
         int tokenLine = token.getLine();
-        if (tokenType.equals("INTEGER_CONST")) {
-            int value = Integer.parseInt(tokenText);
-            System.out.println(tokenType + " " + value + " at Line " + tokenLine + ".");
-        } else {
-            System.out.println(tokenType + " " + tokenText + " at Line " + tokenLine + ".");
-        }
+        System.out.println(tokenType + " " + tokenText + " at Line " + tokenLine + ".");
     }
 }
