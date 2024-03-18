@@ -28,6 +28,26 @@ public class Main
         String tokenType = SysYLexer.VOCABULARY.getSymbolicName(token.getType());
         String tokenText = token.getText();
         int tokenLine = token.getLine();
-        System.out.println(tokenType + " " + tokenText + " at Line " + tokenLine + ".");
+        if (tokenType.equals("INTEGER_CONST")) {
+            int value = parseTokenValue(tokenText);
+            System.out.println(tokenType + " " + value + " at Line " + tokenLine + ".");
+        } else {
+            System.out.println(tokenType + " " + tokenText + " at Line " + tokenLine + ".");
+        }
+    }
+
+    private static int parseTokenValue(String tokenText) {
+        try {
+            if (tokenText.startsWith("0x") || tokenText.startsWith("0X")) {
+                return Integer.parseInt(tokenText.substring(2), 16);
+            } else if (tokenText.startsWith("0") && tokenText.length() > 1) {
+                return Integer.parseInt(tokenText, 8);
+            } else {
+                return Integer.parseInt(tokenText);
+            }
+        } catch (NumberFormatException e) {
+            System.err.println("Invalid number format: " + tokenText);
+            return 0;
+        }
     }
 }
