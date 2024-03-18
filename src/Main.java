@@ -1,18 +1,18 @@
+import org.antlr.v4.runtime.CharStream;
+import org.antlr.v4.runtime.CharStreams;
+
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 public class Main
 {    
-    public static void main(String[] args){
-        if (args.length == 0) {
-            System.out.println("Usage: make run FILEPATH=path");
-            return;
+    public static void main(String[] args) throws IOException {
+        if (args.length < 1) {
+            System.err.println("input path is required");
         }
-        try {
-            String content = Files.readString(Path.of(args[0]));
-            System.out.print(content);
-        } catch (Exception e) {
-            System.out.println("Error: " + e.getMessage());
-        }
+        String source = args[0];
+        CharStream input = CharStreams.fromFileName(source);
+        SysYLexer sysYLexer = new SysYLexer(input);
     }
 }
