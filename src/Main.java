@@ -23,10 +23,9 @@ public class Main
     }
 
     private static void printSysYTokenInformation(Token token) {
-        String tokenType = SysYLexer.VOCABULARY.getSymbolicName(token.getType());
+        String tokenType = SysYLexer.VOCABULARY.getDisplayName(token.getType());
         String tokenText = token.getText();
         int tokenLine = token.getLine();
-        int tokenColumn = token.getCharPositionInLine();
-        System.out.println(tokenType + " " + tokenText + " " + tokenLine + " " + tokenColumn);
+        System.out.println(tokenType + " " + tokenText + " at Line " + tokenLine + ".");
     }
 }
