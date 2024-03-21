@@ -188,7 +188,10 @@ Suppose \texttt{L, M} are languages, we can use set operations to construct new 
     \item \texttt{L\(^+\):= \( \bigcup_{i=1}^{\infty} \) L\(^i\) (Positive closure) }
 \end{enumerate}
 
-After know what is language, let's consider the regular expression.
+The following logic is, we firstly talk about the definition
+of regular expression, then we talk about the definition of 
+non-deterministic finite automaton (NFA), and we define what's the meaning
+of a regular expression is equivalent to a NFA.\@
 \\
 
 \textbf{Regular expression}:
@@ -203,6 +206,58 @@ A regular expression over alphabet \( \Sigma \) is defined as follows:
     \item If \texttt{r, s} are regular expressions, then \texttt{r|s, rs, r*} are also regular expressions.
 \end{enumerate}
 
+Regular expressions are prioritized as follows: \texttt{()} > \texttt{*} > \texttt{concat} > \texttt{|}.
+
+Regular expressions define a language we call the regular language. The rules are as follows:
+
+\begin{enumerate}
+    \item \texttt{L\((\epsilon)\)} = \{ \( \epsilon \) \}.
+    \item \texttt{L{(a)}} = \{ \texttt{a} \}, \( \forall\ \texttt{a} \in \Sigma \).
+    \item \texttt{L{((r))}} = \texttt{L{(r)}}.
+    \item \texttt{L{(r|s)}} = \texttt{L{(r)}} \( \cup \) \texttt{L{(s)}}, \texttt{L{(rs)} = L{(r)}L{(s)}}, \texttt{L{(r*)} = (L{(r)})*}.
+\end{enumerate}
+
+Note: If \texttt{r1, r2} is a regular expression, then:
+
+\begin{enumerate}
+    \item \texttt{r1?} represents \texttt{0 or 1 r1}.
+    \item \texttt{r1/r2} represents Indicates that \texttt{r1} when followed by \texttt{r2}.
+\end{enumerate}
+
+\textbf{NFA\@: non-deterministc-finite automaton}:
+\\
+
+A NFA is a five-tuple represented as \( \mathcal{A} = (\Sigma, \text{S}, \text{s}_0, \delta, \text{F}) \) with the following properties:
+
+\begin{enumerate}
+    \item Alphabet \( \Sigma (\epsilon \notin \Sigma) \).
+    \item S is a finite set of states.
+    \item \( \text{s}_0 \in \text{S} \) is the only start state.
+    \item \( \delta : \text{S} \times (\Sigma \cup \{ \epsilon \}) \to 2^{\text{S}} \)
+    \item F is a set of accept states.
+\end{enumerate}
+
+Note that the requirement \textbf{only} in property 3 is not necessary, because if there exists more
+then one start state, we can define a new start state and the original start states is constructed as
+a \( \epsilon\text{-closure} \) of the new start state.
+\\
+
+And the definition of NFA actually define a language \texttt{L}\( (\mathcal{A}) \), which is composed of all the strings
+that can be accepted by the NFA\@.
+\\
+
+Two important questions of NFA\@:
+\begin{enumerate}
+    \item Given a string \texttt{s}, is \texttt{s} in \texttt{L}\( (\mathcal{A}) \)?
+    \item What is \texttt{L} \( (\mathcal{A}) \)?
+\end{enumerate}
+
+\textbf{Equivalence of regular expression and NFA}:
+\\
+
+Now we can talk about what is the meaning of a regular expression is equivalent to a NFA\@.
+We call a regular expression \texttt{r} is equivalent to a NFA \( \mathcal{A} \) if and only if
+\texttt{L{(r)}} is equivalent to \texttt{L} \( (\mathcal{A}) \) as two sets.
 
 
 \pagebreak
