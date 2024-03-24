@@ -258,7 +258,49 @@ Two important questions of NFA\@:
 Now we can talk about what is the meaning of a regular expression is equivalent to a NFA\@.
 We call a regular expression \texttt{r} is equivalent to a NFA \( \mathcal{A} \) if and only if
 \texttt{L{(r)}} is equivalent to \texttt{L} \( (\mathcal{A}) \) as two sets.
+\\
 
+Let's start to talk about how to convert a \texttt{re} to a \texttt{NFA}, which let us introduce an algorithm called \textbf{Thompson's construction}.
+\\
+
+So the idea of Thompson's construction is very simple, in order to know how to convert a regular expression
+to a NFA, what we only need to do is to know the conversion rules corresponding to the definition of regular expression.
+
+\begin{enumerate}
+    \item if \( \epsilon \) is a regular expression, then the corresponding NFA is:
+    \[
+        \begin{tikzpicture}[shorten >=1pt,node distance=2cm,on grid,auto]
+            \node[state,initial] (q_0)   {q};
+            \node[state,accepting] (q_1) [right=of q_0] {f};
+            \path[->]
+            (q_0) edge node { \( \epsilon \) } (q_1);
+        \end{tikzpicture}
+    \]
+    \item if \texttt{a} is a regular expression, then the corresponding NFA is:
+    \[
+        \begin{tikzpicture}[shorten >=1pt,node distance=2cm,on grid,auto]
+            \node[state,initial] (q_0)   {q};
+            \node[state,accepting] (q_1) [right=of q_0] {f};
+            \path[->]
+            (q_0) edge node { \texttt{a} } (q_1);
+        \end{tikzpicture}
+    \]
+    \item The NFA of \texttt{(s)} is the same as the NFA of \texttt{s}.
+    \item The NFA of \texttt{r|s} (Given \texttt{NFA{(s)}} and \texttt{NFA{(r)}}) is:
+    \[
+        \begin{tikzpicture}[shorten >=1pt,node distance=2cm,on grid,auto]
+            \node[state,initial] (q_0) {$q$};
+            \node[state] (q_1) [above right=of q_0] {\texttt{NFA(s)}};
+            \node[state] (q_2) [below right=of q_0] {\texttt{NFA(r)}};
+            \node[state, accepting] (q_3) [below right=of q_1] {$f$};
+            \path[->]
+            (q_0) edge node {$\epsilon$} (q_1)
+            (q_0) edge node {$\epsilon$} (q_2)
+            (q_1) edge node {$\epsilon$} (q_3)
+            (q_2) edge node {$\epsilon$} (q_3);
+        \end{tikzpicture}
+    \]
+\end{enumerate}
 
 \pagebreak
 
