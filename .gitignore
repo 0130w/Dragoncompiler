@@ -5,11 +5,11 @@
 /src/*Parser.java 
 /src/*ParserBaseListener.java
 /src/*ParserBaseVisitor.java
-/src/*ParserListener.java
-/src/*ParserVisitor.java
+!/src/*ParserListener.java
+!/src/*ParserVisitor.java
+/src/SysYParser*.java
 /classes
 .DS_Store
 /out
 /.idea
 /Lab.iml
-/out

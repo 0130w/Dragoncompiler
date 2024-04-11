@@ -1,0 +1,13 @@
+int a() {}
+int b() {}
+int c() {}
+
+
+int d() {
+    if(a    > 1)
+        a = 3;
+    else if(a > 2)
+        a = 4;
+    else a=5;
+    return;
+}

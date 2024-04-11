@@ -1,0 +1,22 @@
+void main() {
+    int result = bar(5, 10);
+    int firstElement = baz(arr);
+    int matrixElement = v[1][2];
+    ;
+    {
+    };;;
+    while(1) {
+        if(cond > 1) {
+        } else if (cond) {
+            while(1)
+                a = 8;
+        } else
+            while(1)
+                a = 8;
+        if(cond > 1)
+            a= 1 ;
+        else if (cond)
+            a = a;
+        else b;
+    }
+}

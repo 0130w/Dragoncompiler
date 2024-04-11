@@ -1,8 +1,9 @@
 import org.antlr.v4.runtime.CharStream;
 import org.antlr.v4.runtime.CharStreams;
-import org.antlr.v4.runtime.Token;
+import org.antlr.v4.runtime.CommonTokenStream;
+import org.antlr.v4.runtime.tree.ParseTreeWalker;
+
 import java.io.IOException;
-import java.util.List;
 
 public class Main
 {    
@@ -12,42 +13,22 @@ public class Main
         }
         String source = args[0];
         CharStream input = CharStreams.fromFileName(source);
+        // get lexer
         SysYLexer sysYLexer = new SysYLexer(input);
         sysYLexer.removeErrorListeners();
-        MyErrorListener myErrorListener = new MyErrorListener();
-        sysYLexer.addErrorListener(myErrorListener);
-        List<? extends Token> myTokens = sysYLexer.getAllTokens();
-        if (!myErrorListener.hasError()) {
-            for (Token token : myTokens) {
-                printSysYTokenInformation(token);
-            }
-        }
-    }
+        TokenErrorListener myTokenErrorListener = new TokenErrorListener();
+        sysYLexer.addErrorListener(myTokenErrorListener);
+        CommonTokenStream tokens = new CommonTokenStream(sysYLexer);
+        SysYParser sysYParser = new SysYParser(tokens);
+        ParseErrorListener myParseErrorListener = new ParseErrorListener();
+        sysYParser.removeErrorListeners();
+        sysYParser.addErrorListener(myParseErrorListener);
 
-    private static void printSysYTokenInformation(Token token) {
-        String tokenType = SysYLexer.VOCABULARY.getSymbolicName(token.getType());
-        String tokenText = token.getText();
-        int tokenLine = token.getLine();
-        if (tokenType.equals("INTEGER_CONST")) {
-            int value = parseTokenValue(tokenText);
-            System.err.println(tokenType + " " + value + " at Line " + tokenLine + ".");
-        } else {
-            System.err.println(tokenType + " " + tokenText + " at Line " + tokenLine + ".");
-        }
-    }
-
-    private static int parseTokenValue(String tokenText) {
-        try {
-            if (tokenText.startsWith("0x") || tokenText.startsWith("0X")) {
-                return Integer.parseInt(tokenText.substring(2), 16);
-            } else if (tokenText.startsWith("0") && tokenText.length() > 1) {
-                return Integer.parseInt(tokenText, 8);
-            } else {
-                return Integer.parseInt(tokenText);
-            }
-        } catch (NumberFormatException e) {
-            System.err.println("Invalid number format: " + tokenText);
-            return 0;
+        ParserListener listener = new ParserListener(tokens);
+        ParseTreeWalker walker = new ParseTreeWalker();
+        walker.walk(listener, sysYParser.program());
+        if(!myParseErrorListener.hasError()) {
+            System.out.println(listener.getFormattedText());
         }
     }
 }

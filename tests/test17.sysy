@@ -1,0 +1,11 @@
+void foo() {
+    return;
+}
+
+int bar(int a, int b) {
+    return a + b;
+}
+
+int baz(int arr[]) {
+    return arr[0];
+}

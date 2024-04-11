@@ -1,0 +1,1869 @@
+diff --git a/.gitignore b/.gitignore
+index 50d895e..9f0fbc3 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -5,11 +5,11 @@
+ /src/*Parser.java 
+ /src/*ParserBaseListener.java
+ /src/*ParserBaseVisitor.java
+-/src/*ParserListener.java
+-/src/*ParserVisitor.java
++!/src/*ParserListener.java
++!/src/*ParserVisitor.java
++/src/SysYParser*.java
+ /classes
+ .DS_Store
+ /out
+ /.idea
+-/Lab.iml
+-/out
+\ No newline at end of file
++/Lab.iml
+\ No newline at end of file
+diff --git a/src/Color.java b/src/Color.java
+new file mode 100644
+index 0000000..e79b20a
+--- /dev/null
++++ b/src/Color.java
+@@ -0,0 +1,26 @@
++import java.util.HashMap;
++import java.util.Map;
++
++public enum Color {
++    Reset(0),
++    Magenta(35),
++    ResetFore(39),
++    LightRed(91),
++    LightGreen(92),
++    LightYellow(93),
++    LightBlue(94),
++    LightMagenta(95),
++    LightCyan(96),
++    White(97);
++
++    private final int code;
++
++    Color(int code) {
++        this.code = code;
++    }
++
++    public int getCode() {
++        return code;
++    }
++
++}
+diff --git a/src/Effect.java b/src/Effect.java
+new file mode 100644
+index 0000000..ec671a5
+--- /dev/null
++++ b/src/Effect.java
+@@ -0,0 +1,16 @@
++public enum Effect {
++    UnknownEffect(-1),
++    Underlined(4),
++    ResetUnderlined(24),
++    ;
++    private final int code;
++    Effect(int code) {
++        this.code = code;
++    }
++    public int getCode() {
++        return code;
++    }
++    public int getResetCode() {
++        return code + 20;
++    }
++}
+diff --git a/src/Main.java b/src/Main.java
+index 20bd1b6..c3066c1 100644
+--- a/src/Main.java
++++ b/src/Main.java
+@@ -1,8 +1,9 @@
+ import org.antlr.v4.runtime.CharStream;
+ import org.antlr.v4.runtime.CharStreams;
+-import org.antlr.v4.runtime.Token;
++import org.antlr.v4.runtime.CommonTokenStream;
++import org.antlr.v4.runtime.tree.ParseTreeWalker;
++
+ import java.io.IOException;
+-import java.util.List;
+ 
+ public class Main
+ {    
+@@ -12,42 +13,22 @@ public class Main
+         }
+         String source = args[0];
+         CharStream input = CharStreams.fromFileName(source);
++        // get lexer
+         SysYLexer sysYLexer = new SysYLexer(input);
+         sysYLexer.removeErrorListeners();
+-        MyErrorListener myErrorListener = new MyErrorListener();
+-        sysYLexer.addErrorListener(myErrorListener);
+-        List<? extends Token> myTokens = sysYLexer.getAllTokens();
+-        if (!myErrorListener.hasError()) {
+-            for (Token token : myTokens) {
+-                printSysYTokenInformation(token);
+-            }
+-        }
+-    }
+-
+-    private static void printSysYTokenInformation(Token token) {
+-        String tokenType = SysYLexer.VOCABULARY.getSymbolicName(token.getType());
+-        String tokenText = token.getText();
+-        int tokenLine = token.getLine();
+-        if (tokenType.equals("INTEGER_CONST")) {
+-            int value = parseTokenValue(tokenText);
+-            System.err.println(tokenType + " " + value + " at Line " + tokenLine + ".");
+-        } else {
+-            System.err.println(tokenType + " " + tokenText + " at Line " + tokenLine + ".");
+-        }
+-    }
++        TokenErrorListener myTokenErrorListener = new TokenErrorListener();
++        sysYLexer.addErrorListener(myTokenErrorListener);
++        CommonTokenStream tokens = new CommonTokenStream(sysYLexer);
++        SysYParser sysYParser = new SysYParser(tokens);
++        ParseErrorListener myParseErrorListener = new ParseErrorListener();
++        sysYParser.removeErrorListeners();
++        sysYParser.addErrorListener(myParseErrorListener);
+ 
+-    private static int parseTokenValue(String tokenText) {
+-        try {
+-            if (tokenText.startsWith("0x") || tokenText.startsWith("0X")) {
+-                return Integer.parseInt(tokenText.substring(2), 16);
+-            } else if (tokenText.startsWith("0") && tokenText.length() > 1) {
+-                return Integer.parseInt(tokenText, 8);
+-            } else {
+-                return Integer.parseInt(tokenText);
+-            }
+-        } catch (NumberFormatException e) {
+-            System.err.println("Invalid number format: " + tokenText);
+-            return 0;
++        ParserListener listener = new ParserListener(tokens);
++        ParseTreeWalker walker = new ParseTreeWalker();
++        walker.walk(listener, sysYParser.program());
++        if(!myParseErrorListener.hasError()) {
++            System.out.println(listener.getFormattedText());
+         }
+     }
+ }
+\ No newline at end of file
+diff --git a/src/ParseErrorListener.java b/src/ParseErrorListener.java
+new file mode 100644
+index 0000000..74e5561
+--- /dev/null
++++ b/src/ParseErrorListener.java
+@@ -0,0 +1,18 @@
++import org.antlr.v4.runtime.BaseErrorListener;
++import org.antlr.v4.runtime.RecognitionException;
++import org.antlr.v4.runtime.Recognizer;
++import org.antlr.v4.runtime.tree.ErrorNode;
++
++public class ParseErrorListener extends BaseErrorListener {
++    boolean hasError = false;
++
++    @Override
++    public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine, String msg, RecognitionException e) {
++        System.out.println("Error type B at Line " + line + ": " + msg + ".");
++        hasError = true;
++    }
++
++    public boolean hasError() {
++        return hasError;
++    }
++}
+diff --git a/src/ParserListener.java b/src/ParserListener.java
+new file mode 100644
+index 0000000..a641eac
+--- /dev/null
++++ b/src/ParserListener.java
+@@ -0,0 +1,366 @@
++import org.antlr.v4.runtime.BufferedTokenStream;
++import org.antlr.v4.runtime.ParserRuleContext;
++import org.antlr.v4.runtime.Token;
++import org.antlr.v4.runtime.TokenStreamRewriter;
++import org.antlr.v4.runtime.tree.TerminalNode;
++
++import java.util.*;
++
++public class ParserListener extends SysYParserBaseListener{
++
++    BufferedTokenStream tokens;
++    TokenStreamRewriter rewriter;
++    int brace_counts = 0;
++    int indent_level = 0;
++
++    public ParserListener(BufferedTokenStream tokens) {
++        this.tokens = tokens;
++        rewriter = new TokenStreamRewriter(tokens);
++    }
++
++    // TODO! use more efficient structure
++    String[] keywords = {"const", "int", "void", "if",
++            "else", "while", "break", "continue", "return"};
++    String[] operands = {"+", "-", "*", "/", "%", "=", "==", "!=",
++            "<", ">", "<=", ">=", "!", "&&", "||", ",", ";"};
++    String[] ws_keywords = {"const", "int", "void", "if",
++            "else", "while", "return"};
++    String[] binary_operands = {"+", "-", "*", "/", "%", "=", "==", "!=",
++            "<", ">", "<=", ">=", "&&", "||"};
++    private static final Map<Integer, Color> BRACE_COLOR_MAP = new HashMap<>();
++    private static final Set<Integer> L_BRACE_COLOR_LIST = new HashSet<>();
++    private static final Set<Integer> R_BRACE_COLOR_LIST = new HashSet<>();
++    static {
++        BRACE_COLOR_MAP.put(0, Color.LightRed);
++        BRACE_COLOR_MAP.put(1, Color.LightGreen);
++        BRACE_COLOR_MAP.put(2, Color.LightYellow);
++        BRACE_COLOR_MAP.put(3, Color.LightBlue);
++        BRACE_COLOR_MAP.put(4, Color.LightMagenta);
++        BRACE_COLOR_MAP.put(5, Color.LightCyan);
++
++        // See SysYParser.tokens
++        L_BRACE_COLOR_LIST.add(25);
++        L_BRACE_COLOR_LIST.add(27);
++        L_BRACE_COLOR_LIST.add(29);
++
++        R_BRACE_COLOR_LIST.add(26);
++        R_BRACE_COLOR_LIST.add(28);
++        R_BRACE_COLOR_LIST.add(30);
++    }
++
++    Optional<Effect> last_effect = Optional.empty();
++    Stack<Color> color_stack = new Stack<>();
++    Stack<Effect> effect_stack = new Stack<>();
++
++    @Override
++    public void visitTerminal(TerminalNode node) {
++        Token token = node.getSymbol();
++        String text = node.getText();
++        int token_type = token.getType();
++        boolean changeFlag = false;
++
++        if(Arrays.asList(keywords).contains(text)) {
++            color_stack.push(Color.LightCyan);
++            changeFlag = true;
++        } else if(Arrays.asList(operands).contains(text)) {
++            color_stack.push(Color.LightRed);
++            changeFlag = true;
++        } else if(token_type == 34) {
++            // 34 represents INTEGER_CONST, see SysYParser.tokens
++            color_stack.push(Color.Magenta);
++            changeFlag = true;
++        } else if(L_BRACE_COLOR_LIST.contains(token_type)) {
++            color_stack.push(getBraceColor(brace_counts));
++            brace_counts = (brace_counts + 1) % getBraceColorNumber();
++            changeFlag = true;
++        } else if(R_BRACE_COLOR_LIST.contains(token_type)) {
++            brace_counts = (brace_counts - 1 + getBraceColorNumber()) % getBraceColorNumber();
++            color_stack.push(getBraceColor(brace_counts));
++            changeFlag = true;
++        }
++
++        // process function def empty line
++        ParserRuleContext parent = (ParserRuleContext) node.getParent();
++        if(parent.getRuleIndex() == SysYParser.RULE_func_type) {
++            rewriter.insertBefore(token, "\u001B[" + Color.Reset.getCode() + "m" + "\n");
++        }
++
++        // process whitespace after COMMA
++        if(token.getType() == 31) {
++            rewriter.insertAfter(token, "\u001B[" + Color.Reset.getCode() + "m" + " ");
++        }
++
++        // process indentation of else
++        if(token.getType() == 5) {
++            int prev_index = token.getTokenIndex() - 1;
++            boolean flag = false;
++            if(prev_index >= 0) {
++                Token prev_token = rewriter.getTokenStream().get(prev_index);
++                if(prev_token.getType() != 28) {
++                    rewriter.insertBefore(token, "\u001B[" + Color.Reset.getCode() + "m" + "\n" + getIndentWS());
++                    flag = true;
++                }
++            }
++            if(!flag) {
++                rewriter.insertBefore(token, "\u001B[" + Color.Reset.getCode() + "m" + "\n" + getIndentWS());
++            }
++        }
++
++        // process Left Brace
++        processLeftBrace(token, node);
++
++        // add a whitespace after ws_keywords
++        addWSAfterWSKeywords(token);
++
++        // add whitespaces between binary operands
++        addWSBetweenBinaryOps(token, node);
++
++        changeToken(node.getText(), token);
++        if(changeFlag) {
++            color_stack.pop();
++        }
++    }
++
++    @Override
++    public void exitProgram(SysYParser.ProgramContext ctx) {
++        rewriter.replace(ctx.EOF().getSymbol(), "");
++    }
++
++    @Override
++    public void enterStmt(SysYParser.StmtContext ctx) {
++        color_stack.push(Color.White);
++        Token start = ctx.getStart();
++        int prev_index = start.getTokenIndex() - 1;
++
++        if(checkElse(ctx)) {
++            indent_level++;
++        }
++
++        if(checkIfElifWhileCases(ctx)) {
++            indent_level++;
++        }
++
++        indentStmt(ctx);
++
++        if(start.getType() != 27)
++        {
++            boolean check_elif_rbrace = (prev_index >= 0
++                    && ((rewriter.getTokenStream().get(prev_index).getType() == 5
++                    && start.getType() == 4) || rewriter.getTokenStream().get(prev_index).getType() == 28));
++            if(!check_elif_rbrace) {
++                rewriter.insertBefore(start, "\u001B[" + Color.Reset.getCode() + "m" + "\n");
++            }
++        }
++    }
++
++    @Override
++    public void exitStmt(SysYParser.StmtContext ctx) {
++        color_stack.pop();
++        if(checkIfElifWhileCases(ctx)) {
++            indent_level--;
++        }
++        if(checkElse(ctx)) {
++            indent_level--;
++        }
++    }
++
++    @Override
++    public void enterBlock(SysYParser.BlockContext ctx) {
++        Token start = ctx.getStart();
++        Token end = ctx.getStop();
++        ParserRuleContext parent = ctx.getParent();
++        ParserRuleContext ancestor = parent.getParent();
++        boolean check_while_if = (parent.getRuleIndex() == SysYParser.RULE_stmt
++                && ancestor.getRuleIndex() == SysYParser.RULE_stmt);
++        if(!check_while_if) {
++            rewriter.insertBefore(start, getIndentWS());
++        }
++        rewriter.insertBefore(end, getIndentWS());
++        indent_level++;
++    }
++
++    @Override
++    public void exitBlock(SysYParser.BlockContext ctx) {
++        indent_level--;
++        Token end = ctx.getStop();
++        rewriter.insertBefore(end, "\u001B[" + Color.Reset.getCode() + "m" + "\n");
++    }
++
++    @Override
++    public void enterDecl(SysYParser.DeclContext ctx) {
++        last_effect = Optional.of(Effect.Underlined);
++        effect_stack.push(Effect.Underlined);
++        color_stack.push(Color.LightMagenta);
++        Token start = ctx.getStart();
++        rewriter.insertBefore(start, "\u001B[" + Color.Reset.getCode() + "m" + "\n" + getIndentWS());
++    }
++
++    @Override
++    public void exitDecl(SysYParser.DeclContext ctx) {
++        color_stack.pop();
++        effect_stack.pop();
++    }
++
++    @Override
++    public void enterFunc_name(SysYParser.Func_nameContext ctx) { color_stack.push(Color.LightYellow); }
++
++    @Override
++    public void exitFunc_name(SysYParser.Func_nameContext ctx) { color_stack.pop(); }
++
++    @Override
++    public void enterFunc_def(SysYParser.Func_defContext ctx) {
++        Token start = ctx.getStart();
++        int prev_index = start.getTokenIndex() - 1;
++        if(prev_index >= 0) {
++            rewriter.insertBefore(start, "\u001B[" + Color.Reset.getCode() + "m" + "\n");
++        }
++    }
++
++    public String getFormattedText() {
++        // delete consecutive white spaces
++        String modified_text = rewriter.getText();
++        String regex = "^\u001B\\[[;\\d]*m\\s*\\n+";
++        modified_text = modified_text.replaceAll(regex, "");
++        return modified_text;
++    }
++
++    private Color getColor() {
++        return color_stack.isEmpty() ? Color.ResetFore : color_stack.peek();
++    }
++    private Optional<Effect> getEffect() { return effect_stack.isEmpty()? Optional.empty() : Optional.of(effect_stack.peek()); }
++    private Optional<Effect> getResetEffect() { return last_effect; }
++    public Color getBraceColor(int number) {
++        return BRACE_COLOR_MAP.get((number % BRACE_COLOR_MAP.size()));
++    }
++    public int getBraceColorNumber() { return BRACE_COLOR_MAP.size(); }
++    private void changeToken(String text, Token token) {
++        Color color = getColor();
++        String new_text = "\u001B[" + color.getCode() + "m";
++        if(getEffect().isPresent()) {
++            new_text += "\u001B[" + getEffect().get().getCode() + "m";
++        }
++        new_text += text;
++        if(getResetEffect().isPresent()) {
++            new_text += "\u001B[" + getResetEffect().get().getResetCode() + "m";
++        }
++        rewriter.replace(token, new_text);
++    }
++    private void processLeftBrace(Token token, TerminalNode node) {
++        if(token.getType() != 27)
++            return;
++        int prev_index = token.getTokenIndex() - 1;
++        if(prev_index < 0) { return; }
++        Token prev_token = rewriter.getTokenStream().get(prev_index);
++        if(prev_token == null) { return; }
++        int prev_type = prev_token.getType();
++
++        if(prev_type == 32 ||
++                (prev_type == 27
++                        && ((ParserRuleContext) node.getParent()).getRuleIndex() != SysYParser.RULE_init_val
++                        && ((ParserRuleContext) node.getParent()).getRuleIndex() != SysYParser.RULE_const_init_val)
++                || prev_type == 28) {
++            // Type 32 represents SEMICOLON, see SysYParser.tokens
++            rewriter.insertBefore(token, "\u001B[" + Color.Reset.getCode() + "m" + "\n");
++            // if prev is an/a ASSIGN/COMMA, no need to add ws before
++        } else if(!prev_token.getText().endsWith(" ") && prev_type != 15
++                && prev_type != 31){
++            ParserRuleContext parent = (ParserRuleContext) node.getParent();
++            if(parent.getRuleIndex() == SysYParser.RULE_block)
++            rewriter.insertBefore(token, "\u001B[" + Color.Reset.getCode() + "m" + " ");
++        }
++    }
++
++    // add a whitespace after ws_keywords
++    private void addWSAfterWSKeywords(Token token) {
++        if(Arrays.asList(ws_keywords).contains(token.getText())) {
++            Token next_token = rewriter.getTokenStream().get(token.getTokenIndex() + 1);
++            boolean check_semi = token.getType() == 9 && next_token.getType() == 32;
++            if((!check_semi && next_token != null) && !next_token.getText().startsWith(" ")) {
++                boolean single_else_flag = (token.getType() == 5 && next_token.getType() != 4);
++                if(!single_else_flag) {
++                    rewriter.insertAfter(token, "\u001B[" + Color.Reset.getCode() + "m" + " ");
++                }
++            }
++        }
++    }
++
++    // Check if stmt is followed by else without braces
++    // True if yes, false otherwise
++    private boolean checkElse(SysYParser.StmtContext ctx) {
++        Token token = ctx.getStart();
++        int start_type = token.getType();
++        int prev_index = token.getTokenIndex() - 1;
++        if(prev_index >= 0) {
++            Token prev_token = rewriter.getTokenStream().get(prev_index);
++            return start_type != 4 && start_type != 27 && prev_token.getType() == 5;
++        }
++        return false;
++    }
++
++    // Check if stmt is followed by if, else if or while without braces
++    // True if yes, false otherwise
++    private boolean checkIfElifWhileCases(SysYParser.StmtContext ctx) {
++        Token token = ctx.getStart();
++        int prev_index = token.getTokenIndex() - 1;
++        if(prev_index >= 0) {
++            Token prev_token = rewriter.getTokenStream().get(prev_index);
++            int prev_type = prev_token.getType();
++            if(prev_type == 26 && token.getType() != 27) {
++                ParserRuleContext parent = ctx.getParent();
++                int parent_start_type = parent.getStart().getType();
++                return parent.getRuleIndex() == SysYParser.RULE_stmt && (parent_start_type == 4 || parent_start_type == 6);
++            }
++        }
++        return false;
++    }
++
++    // add whitespaces between binary operands
++    private void addWSBetweenBinaryOps(Token token, TerminalNode node) {
++        // process unary operands
++        ParserRuleContext parent = (ParserRuleContext) node.getParent();
++        if(parent.getRuleIndex() == SysYParser.RULE_unary_op) {
++            return;
++        }
++
++        if(Arrays.asList(binary_operands).contains(token.getText())) {
++            Token next_token = rewriter.getTokenStream().get(token.getTokenIndex() + 1);
++            Token prev_token = rewriter.getTokenStream().get(token.getTokenIndex() - 1);
++            if(next_token != null && !next_token.getText().startsWith(" ")) {
++                rewriter.insertAfter(token, "\u001B[" + Color.Reset.getCode() + "m" + " ");
++            }
++            if(prev_token != null && !prev_token.getText().endsWith(" ")) {
++                rewriter.insertBefore(token, "\u001B[" + Color.Reset.getCode() + "m" + " ");
++            }
++        }
++    }
++    private String getIndentWS() {
++        String reset = "\u001B[" + Color.Reset.getCode() + "m";
++        String ws = " ".repeat(indent_level * 4);
++        return reset + ws;
++    }
++
++    private void indentStmt(SysYParser.StmtContext ctx) {
++        Token start = ctx.getStart();
++        int prev_index = start.getTokenIndex() - 1;
++        if(ctx.getChild(0) instanceof SysYParser.BlockContext) {
++            return;
++        }
++        // process if indentation in else if
++        if(start.getType() == 4) {
++            if(prev_index >= 0) {
++                Token prev_token = rewriter.getTokenStream().get(prev_index);
++                if(prev_token.getType() == 5) {
++                    return;
++                }
++            }
++        }
++        if(prev_index >= 0) {
++           Token prev_token = rewriter.getTokenStream().get(prev_index);
++           if(prev_token.getType() == 28) {
++               rewriter.insertBefore(start, "\u001B[" + Color.Reset.getCode() + "m" + "\n" + getIndentWS());
++               return;
++           }
++        }
++        rewriter.insertBefore(start, getIndentWS());
++    }
++}
+\ No newline at end of file
+diff --git a/src/SysYLexer.g4 b/src/SysYLexer.g4
+index 8501c2d..5e8b528 100644
+--- a/src/SysYLexer.g4
++++ b/src/SysYLexer.g4
+@@ -37,5 +37,5 @@ INTEGER_CONST: [1-9][0-9]*
+     | [0][0-7]*
+     | [0][xX][0-9a-fA-F]+;
+ WS: [ \r\n\t] -> skip;
+-LINE_COMMENT: '//' .*? '\n' -> skip;
++LINE_COMMENT: '//' ~[\r\n]* -> skip;
+ MULTILINE_COMMENT: '/*' .*? '*/' -> skip;
+\ No newline at end of file
+diff --git a/src/SysYParser.g4 b/src/SysYParser.g4
+new file mode 100644
+index 0000000..fa43427
+--- /dev/null
++++ b/src/SysYParser.g4
+@@ -0,0 +1,95 @@
++parser grammar SysYParser;
++
++options {
++    tokenVocab = SysYLexer;
++}
++
++program:
++    compUnit EOF
++    ;
++
++compUnit : ( decl | func_def )+;
++
++decl : const_decl
++    | var_decl
++    ;
++
++const_decl : CONST b_type const_def (COMMA const_def)* SEMICOLON ;
++
++b_type : INT;
++
++const_def : IDENT (L_BRACKT const_exp R_BRACKT)* ASSIGN const_init_val;
++
++const_init_val : const_exp
++            | L_BRACE (const_init_val (COMMA const_init_val)*)? R_BRACE
++            ;
++
++var_decl : b_type var_def (COMMA var_def)* SEMICOLON;
++
++var_def : IDENT (L_BRACKT const_exp R_BRACKT)*
++    | IDENT (L_BRACKT const_exp R_BRACKT)* ASSIGN init_val
++    ;
++
++init_val : exp
++    | L_BRACE (init_val (COMMA init_val)*)? R_BRACE
++    ;
++
++func_name: IDENT;
++
++func_def : func_type func_name L_PAREN (func_f_params)? R_PAREN block
++    ;
++
++func_type : VOID
++        | INT
++        ;
++
++func_f_params : func_f_param (COMMA func_f_param)*;
++
++func_f_param : b_type IDENT (L_BRACKT R_BRACKT (L_BRACKT exp R_BRACKT)*)?;
++
++block : L_BRACE (block_item)* R_BRACE;
++
++block_item : decl
++        | stmt
++        ;
++
++stmt : l_val ASSIGN exp SEMICOLON
++    | exp? SEMICOLON
++    | block
++    | IF L_PAREN cond R_PAREN stmt (ELSE stmt)?
++    | WHILE L_PAREN cond R_PAREN stmt
++    | BREAK SEMICOLON
++    | CONTINUE SEMICOLON
++    | RETURN exp? SEMICOLON
++    ;
++
++exp : L_PAREN exp R_PAREN
++    | l_val
++    | number
++    | func_name L_PAREN func_r_params? R_PAREN
++    | unary_op exp
++    | exp (MUL | DIV | MOD) exp
++    | exp (PLUS | MINUS) exp
++    ;
++
++cond : exp
++    | cond (LT | GT | LE | GE) cond
++    | cond (EQ | NEQ) cond
++    | cond AND cond
++    | cond OR cond
++    ;
++
++l_val : IDENT (L_BRACKT exp R_BRACKT)*;
++
++number : INTEGER_CONST;
++
++unary_op : PLUS
++    | MINUS
++    | NOT
++    ;
++
++func_r_params : param (COMMA param)*;
++
++param: exp;
++
++const_exp: exp;
+\ No newline at end of file
+diff --git a/src/MyErrorListener.java b/src/TokenErrorListener.java
+similarity index 91%
+rename from src/MyErrorListener.java
+rename to src/TokenErrorListener.java
+index a0fdc82..cf984c6 100644
+--- a/src/MyErrorListener.java
++++ b/src/TokenErrorListener.java
+@@ -7,7 +7,7 @@ import org.antlr.v4.runtime.dfa.DFA;
+ 
+ import java.util.BitSet;
+ 
+-public class MyErrorListener extends BaseErrorListener {
++public class TokenErrorListener extends BaseErrorListener {
+     boolean hasError = false;
+     @Override
+     public void syntaxError(Recognizer<?, ?> recognizer, Object offendingSymbol, int line, int charPositionInLine, String msg, RecognitionException e) {
+diff --git a/tests/error0.sysy b/tests/error0.sysy
+new file mode 100644
+index 0000000..c7739c8
+--- /dev/null
++++ b/tests/error0.sysy
+@@ -0,0 +1,4 @@
++int main(){
++    int a[];
++    return a][;
++}
+\ No newline at end of file
+diff --git a/tests/error0_result.sysy b/tests/error0_result.sysy
+new file mode 100644
+index 0000000..afc8394
+--- /dev/null
++++ b/tests/error0_result.sysy
+@@ -0,0 +1,2 @@
++Error type B at Line 2: mismatched input ']' expecting {'+', '-', '!', '(', IDENT, INTEGER_CONST}
++Error type B at Line 3: mismatched input ']' expecting {'+', '-', '*', '/', '%', '[', ';'}
+\ No newline at end of file
+diff --git a/tests/error1.sysy b/tests/error1.sysy
+new file mode 100644
+index 0000000..3b76e0c
+--- /dev/null
++++ b/tests/error1.sysy
+@@ -0,0 +1,5 @@
++int main() {
++    /* this is a comment
++    int a = 5;
++    return 0;
++}
+\ No newline at end of file
+diff --git a/tests/error2.sysy b/tests/error2.sysy
+new file mode 100644
+index 0000000..a8ba4b9
+--- /dev/null
++++ b/tests/error2.sysy
+@@ -0,0 +1,4 @@
++int main() {
++    int a = 5
++    return 0;
++}
+\ No newline at end of file
+diff --git a/tests/error3.sysy b/tests/error3.sysy
+new file mode 100644
+index 0000000..b8be9dc
+--- /dev/null
++++ b/tests/error3.sysy
+@@ -0,0 +1,4 @@
++int main() {
++    int arr[5.5];
++    return 0;
++}
+\ No newline at end of file
+diff --git a/tests/error4.sysy b/tests/error4.sysy
+new file mode 100644
+index 0000000..80da2e2
+--- /dev/null
++++ b/tests/error4.sysy
+@@ -0,0 +1,4 @@
++int main() {
++    int a = (3 + 2;
++    return 0;
++}
+\ No newline at end of file
+diff --git a/tests/error5.sysy b/tests/error5.sysy
+new file mode 100644
+index 0000000..6ef40db
+--- /dev/null
++++ b/tests/error5.sysy
+@@ -0,0 +1,4 @@
++int main() {
++    int if = 5;
++    return 0;
++}
+\ No newline at end of file
+diff --git a/tests/test0.sysy b/tests/test0.sysy
+new file mode 100644
+index 0000000..864de62
+--- /dev/null
++++ b/tests/test0.sysy
+@@ -0,0 +1,5 @@
++int main()
++{
++    int a=0;
++    return -a;
++}
+\ No newline at end of file
+diff --git a/tests/test1.sysy b/tests/test1.sysy
+index 90433b7..6ba2bf7 100644
+--- a/tests/test1.sysy
++++ b/tests/test1.sysy
+@@ -1,8 +1,19 @@
++int Fibonacci (int n)
++{
++    int t0 = 0, t1 = 1;
++    int i = 1;
++    while( i < n ){
++        int t2 = t0 + t1;
++        t0 = t1;
++        t1 = t2;
++        i = i + +1;
++    }
++    return t1;
++}
++
++
+ int main()
+ {
+-   // line comment
+-   /*
+-     block comment
+-   */
+-   int i = 0x1;
++    int a = Fibonacci(3);
++    return +0;
+ }
+\ No newline at end of file
+diff --git a/tests/test10.sysy b/tests/test10.sysy
+new file mode 100644
+index 0000000..bdcf66b
+--- /dev/null
++++ b/tests/test10.sysy
+@@ -0,0 +1,17 @@
++const int b = {{
++3}};
++
++int a = {{{{{4}}}}};
++
++int main() {
++    if (a > 1) {
++        if (b > 2)
++            while ( c > 3 ) {
++                if (d > 1) {
++                } else if (a > 1)
++                    a = 7;
++
++                }
++                a = 1;
++}
++}
+\ No newline at end of file
+diff --git a/tests/test11.sysy b/tests/test11.sysy
+new file mode 100644
+index 0000000..401b424
+--- /dev/null
++++ b/tests/test11.sysy
+@@ -0,0 +1,13 @@
++// pwp?
++// qwq
++/* dsjadak
++
++ds*/
++int main() {
++    const int a = {{{{{1}}}}};
++    int b = {{{1}}};
++    while(1)    /*dsajdsakjdha*/
++        if(a>222) { //dssds
++            return 3;
++            }
++}
+\ No newline at end of file
+diff --git a/tests/test12.sysy b/tests/test12.sysy
+new file mode 100644
+index 0000000..d89a6fd
+--- /dev/null
++++ b/tests/test12.sysy
+@@ -0,0 +1,13 @@
++int a = 5, c = {{5}};
++
++void func(int arr[]) {}
++int b = {1};
++
++int main(){
++    int a;int b;
++  a=getint();b = a+2*9;
++  a=func(a,b);putint(a);return a;
++
++}
++
++const int b = {-3};
+\ No newline at end of file
+diff --git a/tests/test13.sysy b/tests/test13.sysy
+new file mode 100644
+index 0000000..1f99b5e
+--- /dev/null
++++ b/tests/test13.sysy
+@@ -0,0 +1,2 @@
++int arr[3] = /* ??? */{1, 2, 3};
++const int c_arr[2][2] = {{1, 2}, {3, 4}};
+\ No newline at end of file
+diff --git a/tests/test14.sysy b/tests/test14.sysy
+new file mode 100644
+index 0000000..b4c2033
+--- /dev/null
++++ b/tests/test14.sysy
+@@ -0,0 +1,8 @@
++// pwp
++int add(int a, int b) {
++    return a + b;
++}
++
++void main() {
++    int result = add(3, 5);
++}
+\ No newline at end of file
+diff --git a/tests/test15.sysy b/tests/test15.sysy
+new file mode 100644
+index 0000000..ffda84c
+--- /dev/null
++++ b/tests/test15.sysy
+@@ -0,0 +1,4 @@
++const int a = 10;
++const int b = 20, c = 30;
++const int d[2] = {1, 2};
++const int e[2][3] = {{{1, 2, 3}}, {{4, 5, 6}}};
+\ No newline at end of file
+diff --git a/tests/test16.sysy b/tests/test16.sysy
+new file mode 100644
+index 0000000..3483293
+--- /dev/null
++++ b/tests/test16.sysy
+@@ -0,0 +1,15 @@
++int x;
++int y = 10;
++int z[5];
++int w[3] = {1, 2, 3};
++int v[2][3] = {{1, 2, 3}, {4, 5, 6}};
++
++int main() {
++    while(1)
++    ;
++    int a;
++    3;
++    continue;
++    if(a>1)continue;
++    if(a>2) return;
++}
+\ No newline at end of file
+diff --git a/tests/test17.sysy b/tests/test17.sysy
+new file mode 100644
+index 0000000..2f54b24
+--- /dev/null
++++ b/tests/test17.sysy
+@@ -0,0 +1,11 @@
++void foo() {
++    return;
++}
++
++int bar(int a, int b) {
++    return a + b;
++}
++
++int baz(int arr[]) {
++    return arr[0];
++}
+\ No newline at end of file
+diff --git a/tests/test18.sysy b/tests/test18.sysy
+new file mode 100644
+index 0000000..bd431f6
+--- /dev/null
++++ b/tests/test18.sysy
+@@ -0,0 +1,28 @@
++void func() {
++x = 10;
++y = x + 5;
++z = y * 2;
++if (z > 20) {
++    z = z - 10;
++} else {
++    z = z + 10;
++}
++
++while (x < 100) {
++    x = x * 2;
++}
++
++break;
++continue;
++return x;
++
++if (x > 10 && y < 20 || z == 30) {
++    while (x != 0) {
++        x = x / 2;
++        if (x == 5) {
++            break;
++        }
++    }
++}
++
++}
+\ No newline at end of file
+diff --git a/tests/test19.sysy b/tests/test19.sysy
+new file mode 100644
+index 0000000..3db9ba5
+--- /dev/null
++++ b/tests/test19.sysy
+@@ -0,0 +1,22 @@
++void main() {
++    int result = bar(5, 10);
++    int firstElement = baz(arr);
++    int matrixElement = v[1][2];
++    ;
++    {
++    };;;
++    while(1) {
++        if(cond > 1) {
++        } else if (cond) {
++            while(1)
++                a = 8;
++        } else
++            while(1)
++                a = 8;
++        if(cond > 1)
++            a= 1 ;
++        else if (cond)
++            a = a;
++        else b;
++    }
++}
+\ No newline at end of file
+diff --git a/tests/test1_result.sysy b/tests/test1_result.sysy
+deleted file mode 100644
+index 98874cf..0000000
+--- a/tests/test1_result.sysy
++++ /dev/null
+@@ -1,11 +0,0 @@
+-INT int at Line 1.
+-IDENT main at Line 1.
+-L_PAREN ( at Line 1.
+-R_PAREN ) at Line 1.
+-L_BRACE { at Line 2.
+-INT int at Line 7.
+-IDENT i at Line 7.
+-ASSIGN = at Line 7.
+-INTEGER_CONST 1 at Line 7.
+-SEMICOLON ; at Line 7.
+-R_BRACE } at Line 8.
+\ No newline at end of file
+diff --git a/tests/test2.sysy b/tests/test2.sysy
+index 187d03a..84eedbe 100644
+--- a/tests/test2.sysy
++++ b/tests/test2.sysy
+@@ -1,4 +1,18 @@
+-int main(){
+-  int i = 1;
+-  int j = ~i;
++const int a = 1;int b = 2;
++int A[10]={8,7,      4};
++
++void print     (int x) {
++}
++
++int a = 0;
++int func(     ) {
++    int c;
++    {print(a);if(cond){c = a + b;{}
++        }
++        else if (cond2)return;
++        else {
++            c = 1;
++            }
++    }
++    return -3;
+ }
+\ No newline at end of file
+diff --git a/tests/test20.sysy b/tests/test20.sysy
+new file mode 100644
+index 0000000..5d4cc7c
+--- /dev/null
++++ b/tests/test20.sysy
+@@ -0,0 +1,4 @@
++// 这是单行注释
++int a = 5; /* 这是
++              多行注释 */
++int    b    =    10    ;
+\ No newline at end of file
+diff --git a/tests/test21.sysy b/tests/test21.sysy
+new file mode 100644
+index 0000000..7684bab
+--- /dev/null
++++ b/tests/test21.sysy
+@@ -0,0 +1,52 @@
++int func(int a, int b){
++    int i;
++    i = a + b;
++
++    int c1;int c2;int c3;int c4;
++    int d1;int d2;int d3;int d4;
++    int e1;int e2;int e3;int e4;
++    int f1;int f2;int f3;int f4;
++    int g1;int g2;int g3;int g4;
++    int h1;int h2;int h3;int h4;
++    int i1;int i2;int i3;int i4;
++    int j1;int j2;int j3;int j4;
++    int k1;int k2;int k3;int k4;
++    c1 = 1;c2 = 2;c3 = 3;c4 = 4;
++    d1 = 1 + c1;d2 = 2 + c2;d3 = 3 + c3;d4 = 4 + c4;
++    e1 = 1 + d1;e2 = 2 + d2;e3 = 3 + d3;e4 = 4 + d4;
++    f1 = 1 + e1;f2 = 2 + e2;f3 = 3 + e3;f4 = 4 + e4;
++    g1 = 1 + f1;g2 = 2 + f2;g3 = 3 + f3;g4 = 4 + f4;
++    h1 = 1 + g1;h2 = 2 + g2;h3 = 3 + g3;h4 = 4 + g4;
++    i1 = 1 + h1;i2 = 2 + h2;i3 = 3 + h3;i4 = 4 + h4;
++    j1 = 1 + i1;j2 = 2 + i2;j3 = 3 + i3;j4 = 4 + i4;
++    k1 = 1 + j1;k2 = 2 + j2;k3 = 3 + j3;k4 = 4 + j4;
++
++    i = a - b + 10;
++    k1 = 1 + j1;k2 = 2 + j2;k3 = 3 + j3;k4 = 4 + j4;
++    j1 = 1 + i1;j2 = 2 + i2;j3 = 3 + i3;j4 = 4 + i4;
++    i1 = 1 + h1;i2 = 2 + h2;i3 = 3 + h3;i4 = 4 + h4;
++    h1 = 1 + g1;h2 = 2 + g2;h3 = 3 + g3;h4 = 4 + g4;
++    g1 = 1 + f1;g2 = 2 + f2;g3 = 3 + f3;g4 = 4 + f4;
++    f1 = 1 + e1;f2 = 2 + e2;f3 = 3 + e3;f4 = 4 + e4;
++    e1 = 1 + d1;e2 = 2 + d2;e3 = 3 + d3;e4 = 4 + d4;
++    d1 = 1 + c1;d2 = 2 + c2;d3 = 3 + c3;d4 = 4 + c4;
++    c1 = 1 + k1;c2 = 2 + k2;c3 = 3 + k3;c4 = 4 + k4;
++    return i + c1 + c2 + c3 + c4
++        - d1 - d2 - d3 - d4
++        + e1 + e2 + e3 + e4
++        - f1 - f2 - f3 - f4
++        + g1 + g2 + g3 + g4
++        - h1 - h2 - h3 - h4
++        + i1 + i2 + i3 + i4
++        - j1 - j2 - j3 - j4
++        + k1 + k2 + k3 + k4 ;
++}
++
++int main(){
++    int a;
++    int b;
++    a = 1;
++    b = a + 2*9;
++
++    return func(a, b);
++}
+\ No newline at end of file
+diff --git a/tests/test22.sysy b/tests/test22.sysy
+new file mode 100644
+index 0000000..d2e6edc
+--- /dev/null
++++ b/tests/test22.sysy
+@@ -0,0 +1,85 @@
++//sample:input n number, sort them and print them;
++   int n;
++   int main()
++   {
++      int a0;
++      int a1;
++      int a2;
++      int a3;
++      int a4;
++      int a5;
++      int a6;
++      int a7;
++      int a8;
++      int a9;
++      int a10;
++      int a11;
++      int a12;
++      int a13;
++      int a14;
++      int a15;
++      int a16;
++      int a17;
++      int a18;
++      int a19;
++      int a20;
++      int a21;
++      int a22;
++      int a23;
++      int a24;
++      int a25;
++      int a26;
++      int a27;
++      int a28;
++      int a29;
++      int b;
++      b = getint();
++      while(b == 5){
++          b = b + 1;
++      }
++      a0=0;
++      a1=a0+1;
++      a2=a1+1;
++      a3=a2+1;
++      a4=a3+1;
++      a5=a4+1;
++      a6=a5+1;
++      a7=a6+1;
++      a8=a7+1;
++      a9=a8+1;
++      a10=a9+1;
++      a11=a10+1;
++      a12=a11+1;
++      a13=a12+1;
++      a14=a13+1;
++      a15=a14+1;
++      a16=a15+1;
++      a17=a16+1;
++      a18=a17+1;
++      a19=a18+1;
++      a20=a19+1;
++      a21=a20+1;
++      a22=a21+1;
++      a23=a22+1;
++      a24=a23+1;
++      a25=a24+1;
++      a26=a25+1;
++      a27=a26+1;
++      a28=a27+1;
++      a29=a28+1;
++      int t;
++      putint(a0);putint(a1);putint(a2);putint(a3);
++      putint(a4);putint(a5);putint(a6);putint(a7);
++      putint(a8);putint(a9);putint(a10);putint(a11);
++      putint(a12);putint(a13);putint(a14);putint(a15);
++      putint(a16);putint(a17);putint(a18);putint(a19);
++      putint(a20);putint(a21);putint(a22);putint(a23);
++      putint(a24);putint(a25);putint(a26);putint(a27);
++      putint(a28);putint(a29);
++      int newline;
++      newline = 10;
++      putch(newline);
++      putint(b);
++      putch(newline);
++      return a25;
++   }
+\ No newline at end of file
+diff --git a/tests/test23.sysy b/tests/test23.sysy
+new file mode 100644
+index 0000000..33f2171
+--- /dev/null
++++ b/tests/test23.sysy
+@@ -0,0 +1,31 @@
++int dec2bin(int a)
++{
++    int res;
++    int k;
++    int i;
++    int temp;
++    res=0;
++    k=1;
++    temp=a;
++    while(temp!=0)
++    {
++        i=temp%2;
++        res=k*i+res;
++        k=k*10;
++        temp=temp/2;
++    }
++   return res;
++
++}
++
++int main()
++{
++    int a;
++    a=400;
++    int res;
++    res=dec2bin(a);
++    putint(res);
++    res = 10;
++    putch(res);
++    return 0;
++}
+\ No newline at end of file
+diff --git a/tests/test24.sysy b/tests/test24.sysy
+new file mode 100644
+index 0000000..e62ec5e
+--- /dev/null
++++ b/tests/test24.sysy
+@@ -0,0 +1,27 @@
++int main()
++{
++    int i;
++    int j;
++    int k;
++    int t;
++    i=0;j=0;k=0;
++    while(i<21)
++    {
++        while(j<101-i)
++        {
++            k=100-i-j;
++            if(5*i+1*j+k/2==100)
++            {
++                putint(i);
++                putint(j);
++                putint(k);
++                t=10;
++                putch(t);
++            }
++            j=j+1;
++        }
++        i=i+1;
++    }
++
++    return 0;
++}
+\ No newline at end of file
+diff --git a/tests/test25.sysy b/tests/test25.sysy
+new file mode 100644
+index 0000000..f3da7e7
+--- /dev/null
++++ b/tests/test25.sysy
+@@ -0,0 +1,23 @@
++// array as parameter of a function
++int field[2];
++
++int func(int array[]) {
++	return array[3 - field[0]];
++}
++
++int main() {
++	int i[1];
++	int j[3];
++	int k;
++
++	field[0] = 1;
++	field[1] = 2;
++
++
++	j[0 + 0] = -1;
++	j[1] = j[0] - 2;
++	k = j[1];
++	j[2] = 16;
++
++	return func(j) + 2 + k;
++}
+\ No newline at end of file
+diff --git a/tests/test26.sysy b/tests/test26.sysy
+new file mode 100644
+index 0000000..b9653d3
+--- /dev/null
++++ b/tests/test26.sysy
+@@ -0,0 +1,50 @@
++void spmv(int n,int xptr[], int yidx[], int vals[], int b[], int x[]){
++    int i, j, k;
++    i = 0;
++    while (i < n){
++        x[i] = 0;
++        i = i + 1;
++    }
++
++    i = 0;
++    while (i < n){
++        j = xptr[i];
++        while (j < xptr[i + 1]){
++            x[yidx[j]] = x[yidx[j]] + vals[j];
++            j = j + 1;
++        }
++
++        j = xptr[i];
++        while (j < xptr[i + 1]){
++            x[yidx[j]] = x[yidx[j]] + vals[j] * (b[i] - 1);
++            j = j + 1;
++        }
++        i = i + 1;
++    }
++}
++
++const int N = 100010;
++const int M = 3000000;
++
++int x[N], y[M], v[M];
++int a[N], b[N], c[N];
++
++int main(){
++    int n = getarray(x) - 1;
++    int m = getarray(y);
++    getarray(v);
++
++    getarray(a);
++
++    starttime();
++
++    int i = 0;
++    while (i < 100){
++        spmv(n, x, y, v, a, b);
++        spmv(n, x, y, v, b, a);
++        i=i+1;
++    }
++    stoptime();
++    putarray(n, b);
++    return 0;
++}
+\ No newline at end of file
+diff --git a/tests/test27.sysy b/tests/test27.sysy
+new file mode 100644
+index 0000000..8886578
+--- /dev/null
++++ b/tests/test27.sysy
+@@ -0,0 +1,5 @@
++int main() {
++
++{ } {
++    int al = ml, c = ml, sum;}
++}
+diff --git a/tests/test2_result.sysy b/tests/test2_result.sysy
+deleted file mode 100644
+index 5de0429..0000000
+--- a/tests/test2_result.sysy
++++ /dev/null
+@@ -1 +0,0 @@
+-Error type A at Line 3: Mysterious character "~".
+\ No newline at end of file
+diff --git a/tests/test3.sysy b/tests/test3.sysy
+index ccddd00..097b18f 100644
+--- a/tests/test3.sysy
++++ b/tests/test3.sysy
+@@ -1,20 +1,32 @@
+-int func(int arg) {
+-    int l;
+-    l = - - - arg;
+-    return l;
+-}
++const int INF= 65535;int e[16][16];int book[16];int dis[16];int n, m;int v1, v2, w;
+ 
+-int main() {
+-    int x, y;
+-    x = 02;
+-    y = 0x1;
+-    x = x - 1 + y;
+-    if (+-!!!x) {
+-        x = - - -2;
++void Dijkstra() {int i, j;i = 1;
++    while (i <= n) {dis[i] = e[1][i];book[i] = 0;
++        i = i + 1;
+     }
+-    else {
+-        x = 1 + + y;
++    book[1] = 1;
++    i = 1;
++    while (i <= n - 1) {
++        int min_num = INF;
++        int min_index = 0;
++        int k = 1;
++        while (k <= n) {
++            if (min_num > dis[k] && book[k] == 0) {
++                min_num = dis[k];
++                min_index = k;
++            }
++            k = k + 1;
++        }
++        book[min_index] = 1;
++        int j = 1;
++        while (j <= n) {
++            if (e[min_index][j] < INF) {
++                if (dis[j] > dis[min_index] + e[min_index][j]) {
++                    dis[j] = dis[min_index] + e[min_index][j];
++                }
++            }
++            j = j + 1;
++        }
++        i = i + 1;
+     }
+-    func(x);
+-    return 0;
+ }
+\ No newline at end of file
+diff --git a/tests/test3_result.sysy b/tests/test3_result.sysy
+deleted file mode 100644
+index 84a9ab8..0000000
+--- a/tests/test3_result.sysy
++++ /dev/null
+@@ -1,84 +0,0 @@
+-INT int at Line 1.
+-IDENT func at Line 1.
+-L_PAREN ( at Line 1.
+-INT int at Line 1.
+-IDENT arg at Line 1.
+-R_PAREN ) at Line 1.
+-L_BRACE { at Line 1.
+-INT int at Line 2.
+-IDENT l at Line 2.
+-SEMICOLON ; at Line 2.
+-IDENT l at Line 3.
+-ASSIGN = at Line 3.
+-MINUS - at Line 3.
+-MINUS - at Line 3.
+-MINUS - at Line 3.
+-IDENT arg at Line 3.
+-SEMICOLON ; at Line 3.
+-RETURN return at Line 4.
+-IDENT l at Line 4.
+-SEMICOLON ; at Line 4.
+-R_BRACE } at Line 5.
+-INT int at Line 7.
+-IDENT main at Line 7.
+-L_PAREN ( at Line 7.
+-R_PAREN ) at Line 7.
+-L_BRACE { at Line 7.
+-INT int at Line 8.
+-IDENT x at Line 8.
+-COMMA , at Line 8.
+-IDENT y at Line 8.
+-SEMICOLON ; at Line 8.
+-IDENT x at Line 9.
+-ASSIGN = at Line 9.
+-INTEGER_CONST 2 at Line 9.
+-SEMICOLON ; at Line 9.
+-IDENT y at Line 10.
+-ASSIGN = at Line 10.
+-INTEGER_CONST 1 at Line 10.
+-SEMICOLON ; at Line 10.
+-IDENT x at Line 11.
+-ASSIGN = at Line 11.
+-IDENT x at Line 11.
+-MINUS - at Line 11.
+-INTEGER_CONST 1 at Line 11.
+-PLUS + at Line 11.
+-IDENT y at Line 11.
+-SEMICOLON ; at Line 11.
+-IF if at Line 12.
+-L_PAREN ( at Line 12.
+-PLUS + at Line 12.
+-MINUS - at Line 12.
+-NOT ! at Line 12.
+-NOT ! at Line 12.
+-NOT ! at Line 12.
+-IDENT x at Line 12.
+-R_PAREN ) at Line 12.
+-L_BRACE { at Line 12.
+-IDENT x at Line 13.
+-ASSIGN = at Line 13.
+-MINUS - at Line 13.
+-MINUS - at Line 13.
+-MINUS - at Line 13.
+-INTEGER_CONST 2 at Line 13.
+-SEMICOLON ; at Line 13.
+-R_BRACE } at Line 14.
+-ELSE else at Line 15.
+-L_BRACE { at Line 15.
+-IDENT x at Line 16.
+-ASSIGN = at Line 16.
+-INTEGER_CONST 1 at Line 16.
+-PLUS + at Line 16.
+-PLUS + at Line 16.
+-IDENT y at Line 16.
+-SEMICOLON ; at Line 16.
+-R_BRACE } at Line 17.
+-IDENT func at Line 18.
+-L_PAREN ( at Line 18.
+-IDENT x at Line 18.
+-R_PAREN ) at Line 18.
+-SEMICOLON ; at Line 18.
+-RETURN return at Line 19.
+-INTEGER_CONST 0 at Line 19.
+-SEMICOLON ; at Line 19.
+-R_BRACE } at Line 20.
+\ No newline at end of file
+diff --git a/tests/test4.sysy b/tests/test4.sysy
+index 7a9f313..c067bd8 100644
+--- a/tests/test4.sysy
++++ b/tests/test4.sysy
+@@ -1,22 +1,37 @@
+-int array()
+-{
+-    int arr[10] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
++int n;
+ 
+-    int a1 = 0, a2 = 3, a3 = 5, a4 = 7, a5 = 9, a6 = 1, a7 = 2, a8 = 4,
+-        a9 = 6;
+-
+-    return arr[a1] + arr[a2] + arr[a3] + arr[a4] + arr[a7] + arr[a8];
++void putint(int i) {
+ }
+ 
+-int main()
+-{
+-    int q = 1, r = 2, s = 04, t = 0x7, u = 0xA, v = 0xb, w = 0xcD, x = 077;
+-
+-    int sum1 = q + r + s + t + u + v + w + x;
+-
+-    int sum2 = array();
+-
+-    int sum3 = sum1 + sum2;
+-
++int bubblesort(int arr[]) {
++    int i;
++    int j;
++    i = 0;
++    while (i < n - 1) {
++        j = 0;
++        while (j <  n - i - 1) {
++            if (arr[j] > arr[j + 1]) {
++                int tmp;
++                tmp = arr[j + 1];
++                arr[j + 1] = arr[j];
++                arr[j] = tmp;
++            }
++            j = j + 1;
++        }
++        i = i + 1;
++    }
+     return 0;
++}
++
++int insertsort(int a[]) {
++    int i;
++    i = 1;
++    while (i < n) {
++        int temp;
++        temp = a[i];
++        int j;
++        j = i - 1;
++        while (j > -1 && temp < a[j]) {
++        }
++    }
+ }
+\ No newline at end of file
+diff --git a/tests/test4_result.sysy b/tests/test4_result.sysy
+deleted file mode 100644
+index 360c107..0000000
+--- a/tests/test4_result.sysy
++++ /dev/null
+@@ -1,177 +0,0 @@
+-INT int at Line 1.
+-IDENT array at Line 1.
+-L_PAREN ( at Line 1.
+-R_PAREN ) at Line 1.
+-L_BRACE { at Line 2.
+-INT int at Line 3.
+-IDENT arr at Line 3.
+-L_BRACKT [ at Line 3.
+-INTEGER_CONST 10 at Line 3.
+-R_BRACKT ] at Line 3.
+-ASSIGN = at Line 3.
+-L_BRACE { at Line 3.
+-INTEGER_CONST 0 at Line 3.
+-COMMA , at Line 3.
+-INTEGER_CONST 1 at Line 3.
+-COMMA , at Line 3.
+-INTEGER_CONST 2 at Line 3.
+-COMMA , at Line 3.
+-INTEGER_CONST 3 at Line 3.
+-COMMA , at Line 3.
+-INTEGER_CONST 4 at Line 3.
+-COMMA , at Line 3.
+-INTEGER_CONST 5 at Line 3.
+-COMMA , at Line 3.
+-INTEGER_CONST 6 at Line 3.
+-COMMA , at Line 3.
+-INTEGER_CONST 7 at Line 3.
+-COMMA , at Line 3.
+-INTEGER_CONST 8 at Line 3.
+-COMMA , at Line 3.
+-INTEGER_CONST 9 at Line 3.
+-R_BRACE } at Line 3.
+-SEMICOLON ; at Line 3.
+-INT int at Line 5.
+-IDENT a1 at Line 5.
+-ASSIGN = at Line 5.
+-INTEGER_CONST 0 at Line 5.
+-COMMA , at Line 5.
+-IDENT a2 at Line 5.
+-ASSIGN = at Line 5.
+-INTEGER_CONST 3 at Line 5.
+-COMMA , at Line 5.
+-IDENT a3 at Line 5.
+-ASSIGN = at Line 5.
+-INTEGER_CONST 5 at Line 5.
+-COMMA , at Line 5.
+-IDENT a4 at Line 5.
+-ASSIGN = at Line 5.
+-INTEGER_CONST 7 at Line 5.
+-COMMA , at Line 5.
+-IDENT a5 at Line 5.
+-ASSIGN = at Line 5.
+-INTEGER_CONST 9 at Line 5.
+-COMMA , at Line 5.
+-IDENT a6 at Line 5.
+-ASSIGN = at Line 5.
+-INTEGER_CONST 1 at Line 5.
+-COMMA , at Line 5.
+-IDENT a7 at Line 5.
+-ASSIGN = at Line 5.
+-INTEGER_CONST 2 at Line 5.
+-COMMA , at Line 5.
+-IDENT a8 at Line 5.
+-ASSIGN = at Line 5.
+-INTEGER_CONST 4 at Line 5.
+-COMMA , at Line 5.
+-IDENT a9 at Line 6.
+-ASSIGN = at Line 6.
+-INTEGER_CONST 6 at Line 6.
+-SEMICOLON ; at Line 6.
+-RETURN return at Line 8.
+-IDENT arr at Line 8.
+-L_BRACKT [ at Line 8.
+-IDENT a1 at Line 8.
+-R_BRACKT ] at Line 8.
+-PLUS + at Line 8.
+-IDENT arr at Line 8.
+-L_BRACKT [ at Line 8.
+-IDENT a2 at Line 8.
+-R_BRACKT ] at Line 8.
+-PLUS + at Line 8.
+-IDENT arr at Line 8.
+-L_BRACKT [ at Line 8.
+-IDENT a3 at Line 8.
+-R_BRACKT ] at Line 8.
+-PLUS + at Line 8.
+-IDENT arr at Line 8.
+-L_BRACKT [ at Line 8.
+-IDENT a4 at Line 8.
+-R_BRACKT ] at Line 8.
+-PLUS + at Line 8.
+-IDENT arr at Line 8.
+-L_BRACKT [ at Line 8.
+-IDENT a7 at Line 8.
+-R_BRACKT ] at Line 8.
+-PLUS + at Line 8.
+-IDENT arr at Line 8.
+-L_BRACKT [ at Line 8.
+-IDENT a8 at Line 8.
+-R_BRACKT ] at Line 8.
+-SEMICOLON ; at Line 8.
+-R_BRACE } at Line 9.
+-INT int at Line 11.
+-IDENT main at Line 11.
+-L_PAREN ( at Line 11.
+-R_PAREN ) at Line 11.
+-L_BRACE { at Line 12.
+-INT int at Line 13.
+-IDENT q at Line 13.
+-ASSIGN = at Line 13.
+-INTEGER_CONST 1 at Line 13.
+-COMMA , at Line 13.
+-IDENT r at Line 13.
+-ASSIGN = at Line 13.
+-INTEGER_CONST 2 at Line 13.
+-COMMA , at Line 13.
+-IDENT s at Line 13.
+-ASSIGN = at Line 13.
+-INTEGER_CONST 4 at Line 13.
+-COMMA , at Line 13.
+-IDENT t at Line 13.
+-ASSIGN = at Line 13.
+-INTEGER_CONST 7 at Line 13.
+-COMMA , at Line 13.
+-IDENT u at Line 13.
+-ASSIGN = at Line 13.
+-INTEGER_CONST 10 at Line 13.
+-COMMA , at Line 13.
+-IDENT v at Line 13.
+-ASSIGN = at Line 13.
+-INTEGER_CONST 11 at Line 13.
+-COMMA , at Line 13.
+-IDENT w at Line 13.
+-ASSIGN = at Line 13.
+-INTEGER_CONST 205 at Line 13.
+-COMMA , at Line 13.
+-IDENT x at Line 13.
+-ASSIGN = at Line 13.
+-INTEGER_CONST 63 at Line 13.
+-SEMICOLON ; at Line 13.
+-INT int at Line 15.
+-IDENT sum1 at Line 15.
+-ASSIGN = at Line 15.
+-IDENT q at Line 15.
+-PLUS + at Line 15.
+-IDENT r at Line 15.
+-PLUS + at Line 15.
+-IDENT s at Line 15.
+-PLUS + at Line 15.
+-IDENT t at Line 15.
+-PLUS + at Line 15.
+-IDENT u at Line 15.
+-PLUS + at Line 15.
+-IDENT v at Line 15.
+-PLUS + at Line 15.
+-IDENT w at Line 15.
+-PLUS + at Line 15.
+-IDENT x at Line 15.
+-SEMICOLON ; at Line 15.
+-INT int at Line 17.
+-IDENT sum2 at Line 17.
+-ASSIGN = at Line 17.
+-IDENT array at Line 17.
+-L_PAREN ( at Line 17.
+-R_PAREN ) at Line 17.
+-SEMICOLON ; at Line 17.
+-INT int at Line 19.
+-IDENT sum3 at Line 19.
+-ASSIGN = at Line 19.
+-IDENT sum1 at Line 19.
+-PLUS + at Line 19.
+-IDENT sum2 at Line 19.
+-SEMICOLON ; at Line 19.
+-RETURN return at Line 21.
+-INTEGER_CONST 0 at Line 21.
+-SEMICOLON ; at Line 21.
+-R_BRACE } at Line 22.
+\ No newline at end of file
+diff --git a/tests/test5.sysy b/tests/test5.sysy
+new file mode 100644
+index 0000000..57e9940
+--- /dev/null
++++ b/tests/test5.sysy
+@@ -0,0 +1,19 @@
++int main()
++{
++    {
++        {
++            {
++                {
++                    {
++                        {
++                            {
++                                {
++                                }
++                            }
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
+\ No newline at end of file
+diff --git a/tests/test6.sysy b/tests/test6.sysy
+new file mode 100644
+index 0000000..96e0683
+--- /dev/null
++++ b/tests/test6.sysy
+@@ -0,0 +1,6 @@
++int main()
++{
++    int a
++        = 3;
++    return a;
++}
+\ No newline at end of file
+diff --git a/tests/test7.sysy b/tests/test7.sysy
+new file mode 100644
+index 0000000..8c4ccfa
+--- /dev/null
++++ b/tests/test7.sysy
+@@ -0,0 +1,13 @@
++int a() {}
++int b() {}
++int c() {}
++
++
++int d() {
++    if(a    > 1)
++        a = 3;
++    else if(a > 2)
++        a = 4;
++    else a=5;
++    return;
++}
+\ No newline at end of file
+diff --git a/tests/test8.sysy b/tests/test8.sysy
+new file mode 100644
+index 0000000..42eb5be
+--- /dev/null
++++ b/tests/test8.sysy
+@@ -0,0 +1 @@
++int A[2][3] = {{1, 2, 3}, {2, 3, 4}};
+\ No newline at end of file
+diff --git a/tests/test9.sysy b/tests/test9.sysy
+new file mode 100644
+index 0000000..0270046
+--- /dev/null
++++ b/tests/test9.sysy
+@@ -0,0 +1,25 @@
++const int a = 1;
++int b = 2;
++int A[10] = {8, 7, 4};
++
++void print(int x) {
++}
++
++int func() {
++    int c;
++    {
++        print(a);
++        if (cond) {
++            c = a + b;
++            {
++            }
++        }
++        else if (cond2) {
++            return;
++        }
++        else
++            c = 1;
++    }
++    return -3;
++}
++

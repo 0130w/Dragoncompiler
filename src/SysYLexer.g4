@@ -37,5 +37,5 @@ INTEGER_CONST: [1-9][0-9]*
     | [0][0-7]*
     | [0][xX][0-9a-fA-F]+;
 WS: [ \r\n\t] -> skip;
-LINE_COMMENT: '//' .*? '\n' -> skip;
+LINE_COMMENT: '//' ~[\r\n]* -> skip;
 MULTILINE_COMMENT: '/*' .*? '*/' -> skip;

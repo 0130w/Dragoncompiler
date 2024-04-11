@@ -1,0 +1,28 @@
+void func() {
+x = 10;
+y = x + 5;
+z = y * 2;
+if (z > 20) {
+    z = z - 10;
+} else {
+    z = z + 10;
+}
+
+while (x < 100) {
+    x = x * 2;
+}
+
+break;
+continue;
+return x;
+
+if (x > 10 && y < 20 || z == 30) {
+    while (x != 0) {
+        x = x / 2;
+        if (x == 5) {
+            break;
+        }
+    }
+}
+
+}

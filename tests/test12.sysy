@@ -1,0 +1,13 @@
+int a = 5, c = {{5}};
+
+void func(int arr[]) {}
+int b = {1};
+
+int main(){
+    int a;int b;
+  a=getint();b = a+2*9;
+  a=func(a,b);putint(a);return a;
+
+}
+
+const int b = {-3};
