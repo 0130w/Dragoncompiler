@@ -1,6 +1,8 @@
 /src/*
 !/src/*.java
 !/src/*.g4
+!/src/Scope
+!/src/Symbol
 /src/*Lexer.java
 /src/*Parser.java 
 /src/*ParserBaseListener.java

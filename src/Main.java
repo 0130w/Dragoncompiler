@@ -4,6 +4,7 @@ import org.antlr.v4.runtime.CommonTokenStream;
 import org.antlr.v4.runtime.tree.ParseTreeWalker;
 
 import java.io.IOException;
+import java.util.Arrays;
 
 public class Main
 {    
@@ -13,7 +14,6 @@ public class Main
         }
         String source = args[0];
         CharStream input = CharStreams.fromFileName(source);
-        // get lexer
         SysYLexer sysYLexer = new SysYLexer(input);
         sysYLexer.removeErrorListeners();
         TokenErrorListener myTokenErrorListener = new TokenErrorListener();
@@ -23,12 +23,9 @@ public class Main
         ParseErrorListener myParseErrorListener = new ParseErrorListener();
         sysYParser.removeErrorListeners();
         sysYParser.addErrorListener(myParseErrorListener);
-
-        ParserListener listener = new ParserListener(tokens);
-        ParseTreeWalker walker = new ParseTreeWalker();
-        walker.walk(listener, sysYParser.program());
-        if(!myParseErrorListener.hasError()) {
-            System.out.println(listener.getFormattedText());
-        }
+        ParserListener parseListener = new ParserListener(tokens);
+        TypeCheckListener typeListener = new TypeCheckListener();
+        ProxyParseTreeListener proxyListener = new ProxyParseTreeListener(Arrays.asList(parseListener, typeListener));
+        ParseTreeWalker.DEFAULT.walk(proxyListener, sysYParser.program());
     }
 }
